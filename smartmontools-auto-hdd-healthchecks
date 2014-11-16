@@ -1,0 +1,110 @@
+#!/bin/bash
+
+
+# Bash script to install and configure smartmontools to periodically check a hard disks health.
+# A finite number of checks are skipped if the drive is found to be spun down to help with drive longevity.
+
+echo
+read -e -p "Do you wish to install and configure smartmontools from scratch (y/n): " -i "y" SETUP_SMARTMONTOOLS
+echo
+
+if [ ! "$SETUP_SMARTMONTOOLS" = "y" ]; then
+  echo "OK exiting script"
+  exit -1
+fi
+
+echo "Installing smartmontools package"
+sudo apt-get install -q smartmontools
+echo
+echo "The following command should show if smart checks are available and if they are enabled on /dev/sda"
+echo "sudo smartctl -a /dev/sda | grep \"SMART support is: \""
+sudo smartctl -a /dev/sda | grep "SMART support is: "
+# desired / usual output from above command
+# SMART support is: Available - device has SMART capability.
+# SMART support is: Enabled
+echo
+echo "If smart is available but not enabled then the following command can enable it"
+echo "sudo smartctl -s on /dev/sda"
+
+# altering /etc/default/smartmontools
+# start smartd on bootup ie replace “#start_smartd=yes” with “start_smartd=yes”
+echo
+echo "Altering /etc/default/smartmontools to auto start smartd on bootup"
+sudo sed -i 's/#start_smartd=yes/start_smartd=yes/g' /etc/default/smartmontools
+
+# unremark the additional options line:-
+echo
+echo "Unremark the default additional options line in /etc/defaults/smartmontools"
+sudo sed -i 's/#smartd_opts/smartd_opts/g' /etc/default/smartmontools
+# and change the interval in seconds of checks from 30mins to 2 hours:-
+# sudo sed -i 's/--interval=1800/--interval=7200/g' /etc/default/smartmontools
+# or leave as it at a 30min check interval (remember checks don't wake the drive is we ask them not to.
+
+# First we have to disable / remark out the default catch all line starting with DEVICESCAN
+echo
+echo "Remove catch all line in /etc/smartd.conf as we manually specifying out checks and devices"
+sudo sed -i 's/^DEVICESCAN/#DEVICESCAN/g' /etc/smartd.conf
+
+# from man smartd.conf
+# why we use -a
+#   -H      Monitor SMART Health Status, report if failed
+#   -f      Monitor for failure of any 'Usage' Attributes
+#   -p      Report changes in 'Prefailure' Normalized Attributes
+#   -u      Report changes in 'Usage' Normalized Attributes
+#   -t      Equivalent to -p and -u Directives
+#   -l TYPE Monitor SMART log.  Type is one of: error, selftest
+# -C	Current Pending Sector count non-zero (197 is usual id for this)
+# -U	Offline uncorrectable sectors non -zero (198 is usual id for this)
+
+#   -a      Default: equivalent to -H -f -t -l error -l selftest -C 197 -U 198
+
+# the -m (main) directive
+# -m	mail to address (root user in this case as we get that anyway)
+
+# from man smartd.conf
+# -n (nocheck)
+#“Typically in  the OFF,  SLEEP,  and STANDBY modes the disk´s platters are not spinning.
+# But usually, in response to SMART commands issued by smartd, the disk platters are spun up.
+# So if  this  option is not used, then a disk which is in a low-power mode may be spun up
+# and put into a higher-power mode when it is periodically polled by smartd."
+
+# from man smartd.conf
+# how to use -n
+# -n standby,15,q
+# so don’t spin up drive to check it unless 15 checks have been skipped already
+# since a skipped check results in an informal log message which will itself wake a drive
+# we use the q to quiet this message and so prevent this spinup.
+
+# scheduling syntax options for smartd
+# MM	month
+# DD	day of month
+# HH	hour
+# d	day of week 1= monday 7 = sunday
+# “.”	in any of the above = all possible values
+# (A|B)	any of either value (or)
+# [1-5]	denotes a range ie 1 to 5
+
+# additional options for temperature, ie Warn if 
+# -W D,I,C Monitor Temperature D)ifference, I)nformal limit, C)ritical limit
+# eg:-
+# -W 6,45,55
+# My NUC 2.5” hdd has a 0-60 C operating range hence the 55 max.
+
+
+# now add our specific drive tests and schedule at the end of the file.
+sudo tee -a /etc/smartd.conf >/dev/null <<__EOF
+
+# Don’t spin up drive to test unless 15 missed checks because of this
+# short self-test once a day except on sunday when we do long self-test (11am for both)
+# mail root with result as we already receive root’s email
+# report errors daily rather than just once
+# an additional -M test directive would also send a test email on smartd startup.
+
+/dev/sda -a -W 6,45,55 -n standby,15,q -s (S/../../[1-6]/11|L/../../7/11) -m root -M daily -M exec \
+/usr/share/smartmontools/smartd-runner
+__EOF
+
+
+
+# One of temperature check:-
+# sudo smartctl -a /dev/sda | grep Temperature

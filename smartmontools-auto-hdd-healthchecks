@@ -42,7 +42,7 @@ sudo sed -i 's/#smartd_opts/smartd_opts/g' /etc/default/smartmontools
 
 # First we have to disable / remark out the default catch all line starting with DEVICESCAN
 echo
-echo "Remove catch all line in /etc/smartd.conf as we manually specifying out checks and devices"
+echo "Removing catch all line in /etc/smartd.conf as we manually specifying our checks and devices"
 sudo sed -i 's/^DEVICESCAN/#DEVICESCAN/g' /etc/smartd.conf
 
 # from man smartd.conf

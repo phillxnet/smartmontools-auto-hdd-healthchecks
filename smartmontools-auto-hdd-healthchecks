@@ -92,6 +92,11 @@ sudo sed -i 's/^DEVICESCAN/#DEVICESCAN/g' /etc/smartd.conf
 
 
 # now add our specific drive tests and schedule at the end of the file.
+echo "Schedule a daily Short test of sda at 11am; except on Sunday when we do a Long test"
+echo "But don’t spin up the drive just to test it unless 15 periodic status checks (every 30 minutes)"
+echo "have been skipped already due to the drive sleeping"
+echo "Also warn if the drive temperature deviates more than 6 degrees during tests"
+echo "and if the temperature reaches a maximum of 55 degrees"
 sudo tee -a /etc/smartd.conf >/dev/null <<__EOF
 
 # Don’t spin up drive to test unless 15 missed checks because of this

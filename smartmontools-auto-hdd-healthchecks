@@ -18,6 +18,8 @@ sudo apt-get install -q smartmontools
 echo
 echo "The following command should show if smart checks are available and if they are enabled on /dev/sda"
 echo "sudo smartctl -a /dev/sda | grep \"SMART support is: \""
+echo "The following 2 lines of text shows the current results of this command"
+echo
 sudo smartctl -a /dev/sda | grep "SMART support is: "
 # desired / usual output from above command
 # SMART support is: Available - device has SMART capability.
